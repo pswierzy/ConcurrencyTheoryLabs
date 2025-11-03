@@ -21,5 +21,4 @@ public class SemaforBinarny {
         stan = true;
         notify();
     }
-
 }

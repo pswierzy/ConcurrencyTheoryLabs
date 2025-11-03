@@ -39,5 +39,4 @@ public class SemaforLicznikowy {
 
         mutex.V();
     }
-
 }
