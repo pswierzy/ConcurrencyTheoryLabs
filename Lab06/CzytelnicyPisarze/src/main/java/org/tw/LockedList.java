@@ -1,101 +1,95 @@
 package org.tw;
 
-import java.util.ArrayList;
-import java.util.List;
 import java.util.Optional;
 import java.util.concurrent.locks.ReentrantLock;
 
 public class LockedList {
+
     private static class Node {
         private Object value;
         private Optional<Node> next = Optional.empty();
-        final ReentrantLock lock = new ReentrantLock();
+        private final ReentrantLock lock = new ReentrantLock();
 
-        public Node(Object value) {
-            if (value == null) throw new IllegalArgumentException("Wartość węzła nie może być null!");
+        Node(Object value) {
+            if (value == null)
+                throw new IllegalArgumentException("Value cannot be null!");
             this.value = value;
         }
 
-        void lock() {
-            lock.lock();
-        }
-        void unlock() {
-            lock.unlock();
-        }
-
-        public Object getValue() {
-            return value;
-        }
-
-        public Optional<Node> getNext() {
-            return next;
-        }
-
-        public void setNext(Optional<Node> next) {
-            this.next = next;
-        }
-
-        public Optional<Node> getNextWithLock() {
-            this.next.ifPresent(Node::lock);
-            return this.next;
-        }
+        void lock() { lock.lock(); }
+        void unlock() { lock.unlock(); }
     }
 
-    private Node head = new Node("");
+    private final Node head = new Node("");  // dummy head
 
-    public Node getLockedTail() {
-        head.lock();
-        Optional<Node> ptr = Optional.ofNullable(head);
-        Optional<Node> prev = ptr;
-        while(ptr.get().getNextWithLock().isPresent()) {
-            prev = ptr;
-            ptr = ptr.get().getNextWithLock();
-            prev.get().unlock();
-        }
-        return ptr.get();
-    }
+    public LockedList() {}
 
-    public List<Optional<Node>> findLocked(Object value) {
-        head.lock();
-        Optional<Node> ptr = Optional.ofNullable(head);
-        Optional<Node> prev = Optional.empty();
-        while(ptr.get().getNextWithLock().isPresent()) {
-            if (ptr.get().getValue().equals(value)) {
-                return List.of(prev, ptr);
+    private Pair find(Object value) {
+        Node prev = head;
+        prev.lock();
+
+        Optional<Node> nextOpt = prev.next;
+
+        while (nextOpt.isPresent()) {
+            Node curr = nextOpt.get();
+            curr.lock();
+
+            if (curr.value.equals(value)) {
+                return new Pair(prev, curr);
             }
-            prev.ifPresent(Node::unlock);
-            prev = ptr;
-            ptr = ptr.get().getNextWithLock();
+
+            prev.unlock();
+            prev = curr;
+            nextOpt = curr.next;
         }
-        if (!ptr.get().getValue().equals(value)) {
-            return List.of(Optional.empty(), Optional.empty());
-        }
-        return List.of(prev, ptr);
+
+        prev.unlock();
+        return new Pair(null, null);
     }
 
-    void add (Object value) {
-        Node node = getLockedTail();
-        node.next = Optional.of(new Node(value));
-        node.unlock();
+    void add(Object value) {
+        Node newNode = new Node(value);
+
+        Node prev = head;
+        prev.lock();
+
+        Optional<Node> nextOpt = prev.next;
+
+        while (nextOpt.isPresent()) {
+            Node curr = nextOpt.get();
+            curr.lock();
+            prev.unlock();
+            prev = curr;
+            nextOpt = curr.next;
+        }
+
+        prev.next = Optional.of(newNode);
+        prev.unlock();
     }
 
-    void remove (Object value) {
-        List<Optional<Node>> ptrs = findLocked(value);
-        Optional<Node> prev = ptrs.get(0);
-        Optional<Node> ptr = ptrs.get(1);
-        if (prev.isPresent()) {
-            prev.get().setNext(ptr.get().getNext());
-            ptr.get().unlock();
-            prev.get().unlock();
-        } else if (ptr.isPresent()) {
-            head = ptr.get().getNext().get();
-            ptr.get().unlock();
-        }
+    void remove(Object value) {
+        Pair p = find(value);
+        if (p.prev == null) return;
+
+        Node prev = p.prev;
+        Node curr = p.curr;
+
+        prev.next = curr.next;
+
+        curr.unlock();
+        prev.unlock();
     }
 
     boolean contains(Object value) {
-        List<Optional<Node>> ptrs = findLocked(value);
-        Optional<Node> ptr = ptrs.get(1);
-        return ptr.isPresent();
+        Pair p = find(value);
+        boolean found = p.curr != null;
+        if (p.curr != null) p.curr.unlock();
+        if (p.prev != null) p.prev.unlock();
+        return found;
+    }
+
+    private static class Pair {
+        final Node prev, curr;
+        Pair(Node prev, Node curr) { this.prev = prev; this.curr = curr; }
     }
 }
