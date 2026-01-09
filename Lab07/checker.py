@@ -285,7 +285,7 @@ def run_foata_scheduler(FNF, context):
             concurrent.futures.wait(futures)
 
             context.print_matrix()
-    
+
     print("KONIEC OBLICZANIA!\n")
 
     print("Normalizacja wyników...\n")
@@ -306,6 +306,7 @@ def program(input_matrix):
     # plot_graph(graph)                     # - można odkomentować dla niskich n
 
     FNF = create_FNF(graph)
+    print(FNF)
 
     ctx = GaussJordanContext(input_matrix)
 
@@ -344,5 +345,7 @@ def checker():
                 print(f"   Wzorzec: {check_matrix[i][j]}")
                 all_ok = False
     assert(all_ok)
+
+    print("ok")
 
 checker()
